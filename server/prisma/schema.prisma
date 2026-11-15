@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SkillType {
+  TEACH
+  LEARN
+}
+
+enum SwapStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id                     String         @id @default(uuid())
+  full_name              String
+  email                  String         @unique
+  password_hash          String
+  avatar_url             String?
+  location               String?
+  bio                    String?
+  proficiency_level      String?        @default("Beginner")
+  role                   UserRole       @default(USER)
+  is_verified            Boolean        @default(false)
+  email_verification_token_hash String?
+  email_verification_expires_at DateTime?
+  password_reset_token_hash String?
+  password_reset_expires_at DateTime?
+  is_active              Boolean        @default(false)
+  created_at             DateTime       @default(now())
+  updated_at             DateTime       @updatedAt
+  skills                 UserSkill[]
+  sent_requests          SwapRequest[]  @relation("SentRequests")
+  received_requests      SwapRequest[]  @relation("ReceivedRequests")
+  messages               Message[]
+  reviews_given          Review[]       @relation("ReviewsGiven")
+  reviews_received       Review[]       @relation("ReviewsReceived")
+  notifications          Notification[]
+  profile_views_made     ProfileView[]  @relation("ProfileViewsMade")
+  profile_views_received ProfileView[]  @relation("ProfileViewsReceived")
+  reports_made           Report[]       @relation("ReportsMade")
+  reports_received       Report[]       @relation("ReportsReceived")
+  reports_resolved       Report[]       @relation("ReportsResolved")
+  refresh_tokens         RefreshToken[]
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  token_hash String   @unique
+  family_id  String
+  user_id    String
+  expires_at DateTime
+  revoked    Boolean  @default(false)
+  created_at DateTime @default(now())
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, revoked])
+  @@index([family_id])
+}
+
+model Category {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+  skills      Skill[]
+}
+
+model Skill {
+  id          String      @id @default(uuid())
+  category_id String
+  name        String      @unique
+  category    Category    @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  user_skills UserSkill[]
+}
+
+model UserSkill {
+  id                String    @id @default(uuid())
+  user_id           String
+  skill_id          String
+  skill_type        SkillType
+  proficiency_level String?
+  user              User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  skill             Skill     @relation(fields: [skill_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, skill_id, skill_type])
+  @@index([skill_id, skill_type])
+}
+
+model SwapRequest {
+  id           String     @id @default(uuid())
+  sender_id    String
+  receiver_id  String
+  status       SwapStatus @default(PENDING)
+  message      String?
+  created_at   DateTime   @default(now())
+  updated_at   DateTime   @updatedAt
+  completed_at DateTime?
+  sender       User       @relation("SentRequests", fields: [sender_id], references: [id], onDelete: Cascade)
+  receiver     User       @relation("ReceivedRequests", fields: [receiver_id], references: [id], onDelete: Cascade)
+  messages     Message[]
+  reviews      Review[]
+  reports      Report[]
+
+  @@index([sender_id, status])
+  @@index([receiver_id, status])
+}
+
+model Message {
+  id              String      @id @default(uuid())
+  swap_request_id String
+  sender_id       String
+  content         String
+  is_read         Boolean     @default(false)
+  sent_at         DateTime    @default(now())
+  swap_request    SwapRequest @relation(fields: [swap_request_id], references: [id], onDelete: Cascade)
+  sender          User        @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@index([swap_request_id, sent_at])
+  @@index([sender_id, is_read])
+}
+
+model Review {
+  id              String      @id @default(uuid())
+  swap_request_id String
+  reviewer_id     String
+  reviewee_id     String
+  rating          Int
+  comment         String?
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+  swap_request    SwapRequest @relation(fields: [swap_request_id], references: [id], onDelete: Cascade)
+  reviewer        User        @relation("ReviewsGiven", fields: [reviewer_id], references: [id], onDelete: Cascade)
+  reviewee        User        @relation("ReviewsReceived", fields: [reviewee_id], references: [id], onDelete: Cascade)
+
+  @@unique([swap_request_id, reviewer_id])
+  @@index([reviewee_id, created_at])
+}
+
+model Notification {
+  id             String   @id @default(uuid())
+  user_id        String
+  type           String
+  title          String
+  message        String
+  reference_type String?
+  reference_id   String?
+  is_read        Boolean  @default(false)
+  created_at     DateTime @default(now())
+  user           User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, is_read, created_at])
+}
+
+model ProfileView {
+  id             String   @id @default(uuid())
+  viewer_id      String
+  viewed_user_id String
+  viewed_at      DateTime @default(now())
+  viewer         User     @relation("ProfileViewsMade", fields: [viewer_id], references: [id], onDelete: Cascade)
+  viewed_user    User     @relation("ProfileViewsReceived", fields: [viewed_user_id], references: [id], onDelete: Cascade)
+
+  @@unique([viewer_id, viewed_user_id])
+  @@index([viewer_id, viewed_at])
+  @@index([viewed_user_id, viewed_at])
+}
+
+model Report {
+  id               String       @id @default(uuid())
+  reporter_id      String
+  reported_user_id String?
+  swap_request_id  String?
+  reason           String
+  status           String       @default("PENDING")
+  resolution_note  String?
+  resolved_by      String?
+  created_at       DateTime     @default(now())
+  resolved_at      DateTime?
+  reporter         User         @relation("ReportsMade", fields: [reporter_id], references: [id], onDelete: Cascade)
+  reported_user    User?        @relation("ReportsReceived", fields: [reported_user_id], references: [id], onDelete: SetNull)
+  swap_request     SwapRequest? @relation(fields: [swap_request_id], references: [id], onDelete: SetNull)
+  resolver         User?        @relation("ReportsResolved", fields: [resolved_by], references: [id], onDelete: SetNull)
+
+  @@index([status, created_at])
+  @@index([reported_user_id])
+}
