@@ -1,0 +1,10 @@
+import express from 'express';
+const router = express.Router();
+import * as controller from '../controllers/profileController.js';
+import { requireAuth } from '../middlewares/authMiddleware.js';
+router.get('/me', requireAuth, controller.getProfile);
+router.put('/me', requireAuth, controller.updateProfile);
+router.delete('/me', requireAuth, controller.deleteAccount);
+router.get('/views/recent', requireAuth, controller.getRecentViews);
+router.get('/:id', requireAuth, controller.getPublicProfile);
+export default router;
