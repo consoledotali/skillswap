@@ -1,0 +1,5 @@
+import prisma from "../config/db.js";
+async function listNotifications(req, res, next) { try { const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100); const notifications = await prisma.notification.findMany({ where: { user_id: req.user.id }, orderBy: { created_at: "desc" }, take: limit }); const unread_count = await prisma.notification.count({ where: { user_id: req.user.id, is_read: false } }); res.json({ notifications, unread_count }); } catch (error) { next(error); } }
+async function markRead(req, res, next) { try { const result = await prisma.notification.updateMany({ where: { id: req.params.id, user_id: req.user.id }, data: { is_read: true } }); if (!result.count) return res.status(404).json({ message: "Notification not found." }); res.json({ ok: true }); } catch (error) { next(error); } }
+async function markAllRead(req, res, next) { try { await prisma.notification.updateMany({ where: { user_id: req.user.id, is_read: false }, data: { is_read: true } }); res.json({ ok: true }); } catch (error) { next(error); } }
+export { listNotifications, markRead, markAllRead };
